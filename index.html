@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#8B5CF6">
+    <title>Esper Event Assistant</title>
+    
+    <!-- React and ReactDOM via CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        purple: {
+                            50: '#faf5ff',
+                            100: '#f3e8ff',
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                            700: '#6d28d9'
+                        },
+                        violet: {
+                            100: '#ede9fe',
+                            600: '#7c3aed'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* Custom animations and mobile optimizations */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        /* Mobile touch targets */
+        @media (max-width: 768px) {
+            button { min-height: 44px; }
+        }
+        
+        /* Loading state */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: system-ui;
+            color: #8b5cf6;
+        }
+    </style>
+</head>
+<body>
+    <div id="root">
+        <div class="loading">Loading Esper Event Assistant...</div>
+    </div>
+    
+    <script>
+        const { useState, useRef, useEffect } = React;
+        
+        function App() {
+            // State Management
+            const [activeTab, setActiveTab] = useState('capture');
+            const [leads, setLeads] = useState([]);
+            const [isRecording, setIsRecording] = useState(false);
+            const [recordedText, setRecordedText] = useState('');
+            const [salesforceConnected, setSalesforceConnected] = useState(false);
+            const [autoSync, setAutoSync] = useState(false);
+            const [leadForm, setLeadForm] = useState({
+                name: '',
+                company: '',
+                title: '',
+                email: '',
+                phone: '',
+                notes: '',
+                priority: 'medium',
+                source: 'booth'
+            });
+            
+            // Voice Recording Function
+            const toggleRecording = () => {
+                if (!isRecording) {
+                    setIsRecording(true);
+                    setTimeout(() => {
+                        setIsRecording(false);
+                        const sampleTranscripts = [
+                            "Met Sarah Chen from TechFlow Solutions. They're looking for a device management solution for their 500 retail kiosks. Currently using an outdated MDM that can't handle their custom Android apps. Interested in a demo next week. High priority lead.",
+                            "Spoke with Marcus Rodriguez, IT Director at HealthFirst. They need to manage 200 patient tablets across 5 locations. Compliance is a major concern. Budget approved for Q2. Wants technical deep-dive on security features.",
+                            "Connected with Lisa Park from RetailMax. Managing 1000+ POS devices manually - major pain point. Looking to streamline operations. Good fit for our retail solutions. Follow up with case studies.",
+                            "Had great conversation with James Wilson from MedTech Innovations. They're expanding to 10 new clinics and need scalable device management. Current solution doesn't integrate with their EMR system. Budget of $50k approved. Schedule demo for next Tuesday."
+                        ];
+                        const randomTranscript = sampleTranscripts[Math.floor(Math.random() * sampleTranscripts.length)];
+                        setRecordedText(randomTranscript);
+                    }, 10000); // 10 seconds
+                } else {
+                    setIsRecording(false);
+                }
+            };
+            
+            // Lead Capture Function
+            const handleLeadSubmit = () => {
+                if (!leadForm.name || !leadForm.company) {
+                    alert('Please fill in required fields (Name and Company)');
+                    return;
+                }
+                
+                const newLead = {
+                    id: Date.now(),
+                    ...leadForm,
+                    timestamp: new Date().toISOString(),
+                    transcription: recordedText,
+                    salesforceId: salesforceConnected ? `SF_${Date.now()}` : null,
+                    syncStatus: salesforceConnected && autoSync ? 'synced' : 'pending'
+                };
+                
+                setLeads([...leads, newLead]);
+                setLeadForm({
+                    name: '',
+                    company: '',
+                    title: '',
+                    email: '',
+                    phone: '',
+                    notes: '',
+                    priority: 'medium',
+                    source: 'booth'
+                });
+                setRecordedText('');
+                alert('Lead captured successfully!');
+            };
+            
+            // Salesforce Connection
+            const connectSalesforce = () => {
+                setSalesforceConnected(true);
+                alert('Successfully connected to Salesforce!\n\n• Access to leads and accounts\n• Real-time sync enabled\n• Custom field mapping configured');
+            };
+            
+            // Export to CSV
+            const exportToCSV = () => {
+                if (leads.length === 0) {
+                    alert('No leads to export');
+                    return;
+                }
+                
+                const csvContent = leads.map(lead => 
+                    `"${lead.name}","${lead.company}","${lead.title}","${lead.email}","${lead.priority}","${lead.notes}","${lead.timestamp}"`
+                ).join('\n');
+                
+                const blob = new Blob([`Name,Company,Title,Email,Priority,Notes,Timestamp\n${csvContent}`], { 
+                    type: 'text/csv' 
+                });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `esper-event-leads-${new Date().toISOString().split('T')[0]}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                alert(`Successfully exported ${leads.length} leads to CSV!`);
+            };
+            
+            // Navigation Tabs
+            const tabs = [
+                { id: 'capture', label: 'Lead Capture', icon: '👥' },
+                { id: 'calendar', label: 'Calendar', icon: '📅' },
+                { id: 'summary', label: 'Summary', icon: '📊' },
+                { id: 'planning', label: 'Planning', icon: '🎯' },
+                { id: 'settings', label: 'Settings', icon: '⚙️' }
+            ];
+            
+            return React.createElement('div', {
+                className: 'min-h-screen bg-gradient-to-br from-purple-50 to-violet-100'
+            }, [
+                React.createElement('div', { key: 'container', className: 'container mx-auto px-4 py-8' }, [
+                    // Header
+                    React.createElement('header', { key: 'header', className: 'text-center mb-8' }, [
+                        React.createElement('div', { key: 'logo', className: 'flex justify-center mb-4' }, [
+                            React.createElement('div', {
+                                key: 'logo-container',
+                                className: 'h-12 mb-2 bg-purple-100 rounded-lg p-2 flex items-center'
+                            }, [
+                                React.createElement('svg', {
+                                    key: 'logo-svg',
+                                    width: '120',
+                                    height: '40',
+                                    viewBox: '0 0 120 40',
+                                    className: 'mb-2'
+                                }, [
+                                    React.createElement('defs', { key: 'defs' }, [
+                                        React.createElement('linearGradient', {
+                                            key: 'gradient',
+                                            id: 'esperGradient',
+                                            x1: '0%',
+                                            y1: '0%',
+                                            x2: '100%',
+                                            y2: '0%'
+                                        }, [
+                                            React.createElement('stop', {
+                                                key: 'stop1',
+                                                offset: '0%',
+                                                stopColor: '#8B5CF6'
+                                            }),
+                                            React.createElement('stop', {
+                                                key: 'stop2',
+                                                offset: '100%',
+                                                stopColor: '#A855F7'
+                                            })
+                                        ])
+                                    ]),
+                                    React.createElement('rect', {
+                                        key: 'rect',
+                                        x: '0',
+                                        y: '0',
+                                        width: '40',
+                                        height: '40',
+                                        rx: '8',
+                                        fill: 'url(#esperGradient)'
+                                    }),
+                                    React.createElement('path', {
+                                        key: 'path',
+                                        d: 'M8 12h24v4H8zm0 8h16v4H8zm0 8h20v4H8z',
+                                        fill: 'white'
+                                    }),
+                                    React.createElement('text', {
+                                        key: 'text1',
+                                        x: '50',
+                                        y: '16',
+                                        fontFamily: 'Arial, sans-serif',
+                                        fontSize: '18',
+                                        fontWeight: 'bold',
+                                        fill: '#7C3AED'
+                                    }, 'esper'),
+                                    React.createElement('text', {
+                                        key: 'text2',
+                                        x: '50',
+                                        y: '32',
+                                        fontFamily: 'Arial, sans-serif',
+                                        fontSize: '10',
+                                        fill: '#A855F7'
+                                    }, 'device management')
+                                ])
+                            ])
+                        ]),
+                        React.createElement('h1', {
+                            key: 'title',
+                            className: 'text-4xl font-bold bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent mb-2'
+                        }, 'Esper Event Assistant'),
+                        React.createElement('p', {
+                            key: 'subtitle',
+                            className: 'text-lg text-black font-medium'
+                        }, 'AI-powered event planning, execution, and follow-up')
+                    ]),
+                    
+                    // Navigation
+                    React.createElement('div', { key: 'nav', className: 'flex justify-center mb-8' }, [
+                        React.createElement('div', {
+                            key: 'nav-container',
+                            className: 'bg-white rounded-lg p-1 shadow-md overflow-x-auto'
+                        }, [
+                            React.createElement('div', { key: 'nav-flex', className: 'flex min-w-max' }, 
+                                tabs.map(tab => 
+                                    React.createElement('button', {
+                                        key: tab.id,
+                                        onClick: () => setActiveTab(tab.id),
+                                        className: `px-4 py-3 rounded-md font-medium transition-all whitespace-nowrap ${
+                                            activeTab === tab.id
+                                                ? 'bg-purple-600 text-white shadow-md'
+                                                : 'text-purple-600 hover:text-purple-700'
+                                        }`
+                                    }, [
+                                        React.createElement('span', { key: 'icon', className: 'mr-2' }, tab.icon),
+                                        tab.label
+                                    ])
+                                )
+                            )
+                        ])
+                    ]),
+                    
+                    // Lead Capture Tab
+                    activeTab === 'capture' && React.createElement('div', {
+                        key: 'capture-tab',
+                        className: 'max-w-4xl mx-auto space-y-6'
+                    }, [
+                        // Voice Notes Section
+                        React.createElement('div', { key: 'voice', className: 'bg-white rounded-xl shadow-lg p-6' }, [
+                            React.createElement('h2', {
+                                key: 'voice-title',
+                                className: 'text-2xl font-bold text-gray-900 mb-6 flex items-center'
+                            }, [
+                                React.createElement('span', { key: 'mic-icon', className: 'text-purple-600 mr-2' }, '🎤'),
+                                'Voice Notes'
+                            ]),
+                            React.createElement('div', { key: 'voice-controls', className: 'text-center mb-6' }, [
+                                React.createElement('button', {
+                                    key: 'record-btn',
+                                    onClick: toggleRecording,
+                                    className: `w-20 h-20 rounded-full flex items-center justify-center mx-auto transition-all ${
+                                        isRecording
+                                            ? 'bg-red-500 hover:bg-red-600 animate-pulse'
+                                            : 'bg-purple-500 hover:bg-purple-600'
+                                    } text-white text-3xl shadow-lg`
+                                }, isRecording ? '⏹️' : '🎤'),
+                                React.createElement('p', {
+                                    key: 'record-text',
+                                    className: 'mt-2 text-gray-600'
+                                }, isRecording ? 'Recording... Tap to stop (10 seconds)' : 'Tap to start voice note')
+                            ]),
+                            recordedText && React.createElement('div', {
+                                key: 'transcript',
+                                className: 'bg-green-50 border border-green-200 rounded-lg p-4'
+                            }, [
+                                React.createElement('h3', {
+                                    key: 'transcript-label',
+                                    className: 'font-semibold text-green-800 mb-2'
+                                }, 'Transcription:'),
+                                React.createElement('p', {
+                                    key: 'transcript-text',
+                                    className: 'text-green-700'
+                                }, recordedText)
+                            ])
+                        ]),
+                        
+                        // Lead Capture Form
+                        React.createElement('div', { key: 'form', className: 'bg-white rounded-xl shadow-lg p-6' }, [
+                            React.createElement('h2', {
+                                key: 'form-title',
+                                className: 'text-2xl font-bold text-gray-900 mb-6 flex items-center'
+                            }, [
+                                React.createElement('span', { key: 'plus-icon', className: 'text-purple-600 mr-2' }, '➕'),
+                                'Lead Capture'
+                            ]),
+                            React.createElement('div', { key: 'form-fields', className: 'space-y-4' }, [
+                                React.createElement('div', {
+                                    key: 'name-company',
+                                    className: 'grid grid-cols-1 md:grid-cols-2 gap-4'
+                                }, [
+                                    React.createElement('div', { key: 'name-field' }, [
+                                        React.createElement('label', {
+                                            key: 'name-label',
+                                            className: 'block text-sm font-medium text-gray-700 mb-2'
+                                        }, 'Name *'),
+                                        React.createElement('input', {
+                                            key: 'name-input',
+                                            type: 'text',
+                                            value: leadForm.name,
+                                            onChange: (e) => setLeadForm({...leadForm, name: e.target.value}),
+                                            className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500',
+                                            placeholder: 'Contact name'
+                                        })
+                                    ]),
+                                    React.createElement('div', { key: 'company-field' }, [
+                                        React.createElement('label', {
+                                            key: 'company-label',
+                                            className: 'block text-sm font-medium text-gray-700 mb-2'
+                                        }, 'Company *'),
+                                        React.createElement('input', {
+                                            key: 'company-input',
+                                            type: 'text',
+                                            value: leadForm.company,
+                                            onChange: (e) => setLeadForm({...leadForm, company: e.target.value}),
+                                            className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500',
+                                            placeholder: 'Company name'
+                                        })
+                                    ])
+                                ]),
+                                React.createElement('div', {
+                                    key: 'title-email',
+                                    className: 'grid grid-cols-1 md:grid-cols-2 gap-4'
+                                }, [
+                                    React.createElement('div', { key: 'title-field' }, [
+                                        React.createElement('label', {
+                                            key: 'title-label',
+                                            className: 'block text-sm font-medium text-gray-700 mb-2'
+                                        }, 'Title'),
+                                        React.createElement('input', {
+                                            key: 'title-input',
+                                            type: 'text',
+                                            value: leadForm.title,
+                                            onChange: (e) => setLeadForm({...leadForm, title: e.target.value}),
+                                            className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500',
+                                            placeholder: 'Job title'
+                                        })
+                                    ]),
+                                    React.createElement('div', { key: 'email-field' }, [
+                                        React.createElement('label', {
+                                            key: 'email-label',
+                                            className: 'block text-sm font-medium text-gray-700 mb-2'
+                                        }, 'Email'),
+                                        React.createElement('input', {
+                                            key: 'email-input',
+                                            type: 'email',
+                                            value: leadForm.email,
+                                            onChange: (e) => setLeadForm({...leadForm, email: e.target.value}),
+                                            className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500',
+                                            placeholder: 'email@company.com'
+                                        })
+                                    ])
+                                ]),
+                                React.createElement('div', {
+                                    key: 'priority-source',
+                                    className: 'grid grid-cols-1 md:grid-cols-2 gap-4'
+                                }, [
+                                    React.createElement('div', { key: 'priority-field' }, [
+                                        React.createElement('label', {
+                                            key: 'priority-label',
+                                            className: 'block text-sm font-medium text-gray-700 mb-2'
+                                        }, 'Priority'),
+                                        React.createElement('select', {
+                                            key: 'priority-select',
+                                            value: leadForm.priority,
+                                            onChange: (e) => setLeadForm({...leadForm, priority: e.target.value}),
+                                            className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500'
+                                        }, [
+                                            React.createElement('option', { key: 'high', value: 'high' }, 'High Priority'),
+                                            React.createElement('option', { key: 'medium', value: 'medium' }, 'Medium Priority'),
+                                            React.createElement('option', { key: 'low', value: 'low' }, 'Low Priority')
+                                        ])
+                                    ]),
+                                    React.createElement('div', { key: 'source-field' }, [
+                                        React.createElement('label', {
+                                            key: 'source-label',
+                                            className: 'block text-sm font-medium text-gray-700 mb-2'
+                                        }, 'Source'),
+                                        React.createElement('select', {
+                                            key: 'source-select',
+                                            value: leadForm.source,
+                                            onChange: (e) => setLeadForm({...leadForm, source: e.target.value}),
+                                            className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500'
+                                        }, [
+                                            React.createElement('option', { key: 'booth', value: 'booth' }, 'Booth Visit'),
+                                            React.createElement('option', { key: 'demo', value: 'demo' }, 'Demo Request'),
+                                            React.createElement('option', { key: 'networking', value: 'networking' }, 'Networking'),
+                                            React.createElement('option', { key: 'referral', value: 'referral' }, 'Referral')
+                                        ])
+                                    ])
+                                ]),
+                                React.createElement('div', { key: 'notes-field' }, [
+                                    React.createElement('label', {
+                                        key: 'notes-label',
+                                        className: 'block text-sm font-medium text-gray-700 mb-2'
+                                    }, 'Notes'),
+                                    React.createElement('textarea', {
+                                        key: 'notes-textarea',
+                                        value: leadForm.notes || recordedText,
+                                        onChange: (e) => setLeadForm({...leadForm, notes: e.target.value}),
+                                        rows: 3,
+                                        className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500',
+                                        placeholder: 'Conversation notes, pain points, next steps...'
+                                    })
+                                ]),
+                                React.createElement('button', {
+                                    key: 'submit-btn',
+                                    onClick: handleLeadSubmit,
+                                    className: 'w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium text-lg'
+                                }, 'Capture Lead')
+                            ])
+                        ]),
+                        
+                        // Captured Leads Preview
+                        leads.length > 0 && React.createElement('div', {
+                            key: 'leads-preview',
+                            className: 'bg-white rounded-xl shadow-lg p-6'
+                        }, [
+                            React.createElement('div', {
+                                key: 'leads-header',
+                                className: 'flex justify-between items-center mb-4'
+                            }, [
+                                React.createElement('h3', {
+                                    key: 'leads-title',
+                                    className: 'text-xl font-bold text-gray-900'
+                                }, `Captured Leads (${leads.length})`),
+                                salesforceConnected && React.createElement('span', {
+                                    key: 'sf-status',
+                                    className: 'text-sm text-green-600 flex items-center'
+                                }, [
+                                    React.createElement('div', {
+                                        key: 'sf-dot',
+                                        className: 'w-2 h-2 bg-green-500 rounded-full mr-2'
+                                    }),
+                                    'Salesforce Connected'
+                                ])
+                            ]),
+                            React.createElement('div', { key: 'leads-list', className: 'space-y-3 mb-4' },
+                                leads.slice(-3).map(lead =>
+                                    React.createElement('div', {
+                                        key: lead.id,
+                                        className: 'border border-gray-200 rounded-lg p-3'
+                                    }, [
+                                        React.createElement('div', {
+                                            key: 'lead-info',
+                                            className: 'flex justify-between items-start'
+                                        }, [
+                                            React.createElement('div', { key: 'lead-details', className: 'flex-1' }, [
+                                                React.createElement('h4', {
+                                                    key: 'lead-name',
+                                                    className: 'font-semibold text-gray-900'
+                                                }, lead.name),
+                                                React.createElement('p', {
+                                                    key: 'lead-company',
+                                                    className: 'text-gray-600'
+                                                }, `${lead.title} at ${lead.company}`),
+                                                lead.email && React.createElement('p', {
+                                                    key: 'lead-email',
+                                                    className: 'text-xs text-blue-600 mt-1'
+                                                }, lead.email)
+                                            ]),
+                                            React.createElement('div', {
+                                                key: 'lead-badges',
+                                                className: 'flex items-center space-x-2'
+                                            }, [
+                                                React.createElement('span', {
+                                                    key: 'priority-badge',
+                                                    className: `px-2 py-1 rounded-full text-xs font-medium ${
+                                                        lead.priority === 'high' ? 'bg-red-100 text-red-800' :
+                                                        lead.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                                        'bg-gray-100 text-gray-800'
+                                                    }`
+                                                }, lead.priority.toUpperCase()),
+                                                salesforceConnected && React.createElement('span', {
+                                                    key: 'sync-badge',
+                                                    className: `px-2 py-1 rounded-full text-xs font-medium ${
+                                                        lead.syncStatus === 'synced' ? 'bg-green-100 text-green-800' :
+                                                        'bg-orange-100 text-orange-800'
+                                                    }`
+                                                }, lead.syncStatus === 'synced' ? '✓ SYNCED' : '⏳ PENDING')
+                                            ])
+                                        ])
+                                    ])
+                                )
+                            ),
+                            React.createElement('div', {
+                                key: 'export-section',
+                                className: 'flex gap-4'
+                            }, [
+                                React.createElement('button', {
+                                    key: 'export-csv',
+                                    onClick: exportToCSV,
+                                    className: 'bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center'
+                                }, [
+                                    React.createElement('span', { key: 'download-icon', className: 'mr-2' }, '📥'),
+                                    'Export CSV'
+                                ]),
+                                React.createElement('button', {
+                                    key: 'sync-sf',
+                                    onClick: () => alert(`Sync ${leads.length} leads to Salesforce!\n\n• ${leads.filter(l => l.priority === 'high').length} marked as hot prospects\n• Follow-up tasks created for sales team`),
+                                    className: 'bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center'
+                                }, [
+                                    React.createElement('span', { key: 'upload-icon', className: 'mr-2' }, '⬆️'),
+                                    'Sync to Salesforce'
+                                ])
+                            ])
+                        ])
+                    ]),
+                    
+                    // Other Tabs (Simplified)
+                    activeTab !== 'capture' && React.createElement('div', {
+                        key: 'other-tabs',
+                        className: 'max-w-4xl mx-auto'
+                    }, [
+                        React.createElement('div', {
+                            key: 'tab-content',
+                            className: 'bg-white rounded-xl shadow-lg p-8 text-center'
+                        }, [
+                            React.createElement('div', { key: 'tab-icon', className: 'mb-4 text-6xl' }, 
+                                activeTab === 'calendar' ? '📅' :
+                                activeTab === 'summary' ? '📊' :
+                                activeTab === 'planning' ? '🎯' : '⚙️'
+                            ),
+                            React.createElement('h2', {
+                                key: 'tab-title',
+                                className: 'text-2xl font-bold text-gray-900 mb-4'
+                            }, 
+                                activeTab === 'calendar' ? 'Calendar Scheduler' :
+                                activeTab === 'summary' ? 'Event Summary' :
+                                activeTab === 'planning' ? 'Pre-Event Planning' : 'Settings & Integrations'
+                            ),
+                            React.createElement('p', {
+                                key: 'tab-description',
+                                className: 'text-gray-600 max-w-md mx-auto mb-6'
+                            }, 
+                                activeTab === 'calendar' ? 'Schedule follow-up meetings and coordinate with your team. Connect with Google Calendar to manage event-related activities.' :
+                                activeTab === 'summary' ? 'View analytics and insights from captured leads. Export data to Salesforce or CSV for follow-up.' :
+                                activeTab === 'planning' ? 'Generate event briefs and analyze which events to attend. Get AI-powered recommendations for maximum ROI.' :
+                                'Configure Salesforce integration, voice settings, and team preferences for seamless event management.'
+                            ),
+                            activeTab === 'settings' && React.createElement('div', { key: 'settings-actions', className: 'space-y-4' }, [
+                                React.createElement('button', {
+                                    key: 'connect-sf',
+                                    onClick: connectSalesforce,
+                                    className: `px-6 py-3 rounded-lg font-medium transition-colors ${
+                                        salesforceConnected
+                                            ? 'bg-green-100 text-green-800'
+                                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                                    }`
+                                }, salesforceConnected ? '✓ Salesforce Connected' : 'Connect Salesforce'),
+                                salesforceConnected && React.createElement('div', {
+                                    key: 'auto-sync-toggle',
+                                    className: 'flex items-center justify-center space-x-3'
+                                }, [
+                                    React.createElement('span', { key: 'toggle-label' }, 'Auto-sync Leads:'),
+                                    React.createElement('button', {
+                                        key: 'toggle-btn',
+                                        onClick: () => setAutoSync(!autoSync),
+                                        className: `px-4 py-2 rounded transition-colors ${
+                                            autoSync ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-600'
+                                        }`
+                                    }, autoSync ? 'ON' : 'OFF')
+                                ])
+                            ])
+                        ])
+                    ])
+                ])
+            ]);
+        }
+        
+        // Render the App
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(App));
+    </script>
+</body>
+</html>
